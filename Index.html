@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>My Real-Time Bus</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #map { height: 70vh; width: 100vw; }
+        .panel { height: 30vh; padding: 20px; background: #fff; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); text-align: center; }
+        #status { color: #555; margin-bottom: 10px; font-size: 14px; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+        button { background: #27ae60; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        .error { color: #e74c3c !important; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+    
+    <div class="panel">
+        <div id="status">Ready to track...</div>
+        <button id="trackBtn" onclick="startTracking()">📡 TURN ON GPS</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let map, marker, circle;
+
+        // Initialize Map (Starting point: India)
+        map = L.map('map').setView([20.5937, 78.9629], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        const busIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+        });
+
+        function startTracking() {
+            const statusDiv = document.getElementById('status');
+            
+            if (!navigator.geolocation) {
+                statusDiv.innerHTML = "❌ GPS not supported on this device/browser.";
+                return;
+            }
+
+            statusDiv.innerHTML = "⏳ Attempting to connect to satellites...";
+
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            };
+
+            // This is the part that connects to your phone's GPS
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+
+                    statusDiv.innerHTML = `✅ <b>Location Found!</b><br>Lat: ${lat.toFixed(5)} | Lng: ${lng.toFixed(5)}<br>Accuracy: ${accuracy.toFixed(0)} meters`;
+                    statusDiv.classList.remove('error');
+
+                    updateMarker(lat, lng, accuracy);
+                },
+                (err) => {
+                    console.error(err);
+                    statusDiv.classList.add('error');
+                    if(err.code === 1) statusDiv.innerHTML = "❌ Error: Permission Denied. Go to Browser Settings and Allow Location.";
+                    else if(err.code === 2) statusDiv.innerHTML = "❌ Error: GPS Signal Weak. Move outside!";
+                    else statusDiv.innerHTML = "❌ Error: " + err.message;
+                },
+                options
+            );
+        }
+
+        function updateMarker(lat, lng, acc) {
+            if (!marker) {
+                marker = L.marker([lat, lng], {icon: busIcon}).addTo(map);
+                circle = L.circle([lat, lng], {radius: acc}).addTo(map);
+                map.setView([lat, lng], 16);
+            } else {
+                marker.setLatLng([lat, lng]);
+                circle.setLatLng([lat, lng]);
+                circle.setRadius(acc);
+                map.panTo([lat, lng]);
+            }
+        }
+    </script>
+</body>
+</html>
