@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Bus Tracker</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; font-family: sans-serif; background: #1a1a1a; color: white; }
+        #map { height: 70vh; width: 100%; }
+        .controls { padding: 20px; text-align: center; }
+        .status-box { 
+            background: #333; padding: 10px; border-radius: 8px; 
+            margin-top: 10px; font-size: 0.9em; color: #00ff00;
+        }
+        button {
+            background: #007bff; color: white; border: none;
+            padding: 15px 30px; border-radius: 30px; font-size: 18px;
+            font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,123,255,0.3);
+        }
+        button:active { transform: scale(0.98); }
+        .error { color: #ff4d4d !important; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <div class="controls">
+        <button id="startBtn" onclick="initTracking()">📡 Start Live Tracking</button>
+        <div class="status-box" id="status">Status: Ready to track</div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        let map, marker, circle, watchID;
+
+        // Initialize Map centered on a default view
+        map = L.map('map').setView([20, 0], 2); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        // Custom Bus Icon
+        const busIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+        });
+
+        function initTracking() {
+            if (!navigator.geolocation) {
+                updateStatus("GPS not supported by browser", true);
+                return;
+            }
+
+            document.getElementById('startBtn').style.display = 'none';
+            updateStatus("Requesting GPS access...");
+
+            // High Accuracy options for mobile
+            const options = {
+                enableHighAccuracy: true, 
+                timeout: 10000,
+                maximumAge: 0
+            };
+
+            watchID = navigator.geolocation.watchPosition(success, error, options);
+        }
+
+        function success(pos) {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const accuracy = pos.coords.accuracy;
+
+            updateStatus(`Live: ${lat.toFixed(5)}, ${lng.toFixed(5)} (Acc: ${accuracy.toFixed(0)}m)`);
+
+            if (!marker) {
+                // First time we get a location
+                marker = L.marker([lat, lng], {icon: busIcon}).addTo(map);
+                circle = L.circle([lat, lng], {radius: accuracy, color: '#007bff'}).addTo(map);
+                map.setView([lat, lng], 16);
+            } else {
+                // Update existing marker and accuracy circle
+                marker.setLatLng([lat, lng]);
+                circle.setLatLng([lat, lng]);
+                circle.setRadius(accuracy);
+                map.panTo([lat, lng]);
+            }
+        }
+
+        function error(err) {
+            let msg = "Error: ";
+            if (err.code === 1) msg += "Please ALLOW location access in your settings.";
+            else if (err.code === 2) msg += "Position unavailable (Check GPS signal).";
+            else msg += "Timeout. Try again.";
+            
+            updateStatus(msg, true);
+            document.getElementById('startBtn').style.display = 'inline-block';
+        }
+
+        function updateStatus(text, isError = false) {
+            const el = document.getElementById('status');
+            el.innerText = text;
+            if (isError) el.classList.add('error');
+            else el.classList.remove('error');
+        }
+    </script>
+</body>
+</html>
